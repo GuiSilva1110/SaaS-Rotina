@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { supabase } from './lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight, BarChart3, CalendarDays, Check, CheckCircle2, ChevronRight,
@@ -108,26 +109,111 @@ const starterHabits = [
 function App() {
   const [route, setRoute] = useState(() => load('planner:route', 'landing'));
   const [user, setUser] = useState(() => load('planner:user', null));
-  const [habits, setHabits] = useState(() => load('planner:habits', starterHabits));
+ const [habits,setHabits] =
+useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+useEffect(() => {
+  if (user) {
+    loadHabits();
+  }
+}, [user]);
+
+  async function loadHabits() {
+  const session = await supabase.auth.getUser();
+  const currentUser = session.data.user;
+
+  if (!currentUser) return;
+
+  const { data: habitsData, error: habitsError } = await supabase
+    .from("habits")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false });
+
+  if (habitsError) {
+    console.log(habitsError);
+    return;
+  }
+
+  const { data: historyData, error: historyError } = await supabase
+    .from("habit_history")
+    .select("*")
+    .eq("user_id", currentUser.id);
+
+  if (historyError) {
+    console.log(historyError);
+    return;
+  }
+
+  const habitsWithHistory = (habitsData || []).map((habit) => {
+    const habitHistory = (historyData || []).filter(
+      (item) => item.habit_id === habit.id
+    );
+
+    const history = {};
+
+    habitHistory.forEach((item) => {
+      history[item.completed_date] = item.completed;
+    });
+
+    return {
+      ...habit,
+      history
+    };
+  });
+
+  setHabits(habitsWithHistory);
+}
   function navigate(next) {
     setRoute(next);
     save('planner:route', next);
     setSidebarOpen(false);
   }
 
-  function login(payload) {
-    const fakeUser = {
-      name: payload.name || 'Guilherme',
+ async function login(payload) {
+  let result;
+
+  if (route === "register") {
+    result = await supabase.auth.signUp({
       email: payload.email,
-      plan: load('planner:plan', 'free')
-    };
-    setUser(fakeUser);
-    save('planner:user', fakeUser);
-    navigate('dashboard');
+      password: payload.password
+    });
+
+    if (result.error) {
+      alert(result.error.message);
+      return;
+    }
+
+    result = await supabase.auth.signInWithPassword({
+      email: payload.email,
+      password: payload.password
+    });
+  } else {
+    result = await supabase.auth.signInWithPassword({
+      email: payload.email,
+      password: payload.password
+    });
   }
 
+  const { data, error } = result;
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  const currentUser = {
+    id: data.user.id,
+    name: payload.name || data.user.email,
+    email: data.user.email,
+    plan: "free"
+  };
+
+  setUser(currentUser);
+  save("planner:user", currentUser);
+  navigate("dashboard");
+}
   function logout() {
     localStorage.removeItem('planner:user');
     setUser(null);
@@ -166,7 +252,7 @@ function Landing({ navigate, user }) {
   return (
     <main className="landing">
       <header className="landing-nav">
-        <div className="nav-brand"><Target size={22}/> Planner Minimalista</div>
+        <div className="nav-brand"><Target size={22}/> Rytmo </div>
         <div>
           {user ? <button className="ghost" onClick={() => navigate('dashboard')}>Abrir painel</button> : <button className="ghost" onClick={() => navigate('login')}>Entrar</button>}
         </div>
@@ -175,11 +261,10 @@ function Landing({ navigate, user }) {
       <section className="landing-hero">
         <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
           <span className="eyebrow"><Sparkles size={16}/> Mantenha sua rotina em dia </span>
-          <h1>Construa hábitos,
+          <h1>Construa sua rotina,
   acompanhe progresso
   e mantenha consistência.</h1>
-          <p>Crie rotinas, acompanhe evolução e visualize seu progresso
-  em um painel simples e elegante.</p>
+          <p>Crie rotinas, acompanhe a evolução e visualize seu progresso.</p>
           <div className="hero-actions">
             <button className="primary inline" onClick={() => navigate(user ? 'dashboard' : 'register')}>Começar agora <ArrowRight size={18}/></button>
             <button className="secondary" onClick={() => navigate('login')}>Ver demo</button>
@@ -214,21 +299,42 @@ function Auth({ mode, onSubmit, navigate }) {
       <section className="hero-card">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="brand">
           <div className="logo"><Target size={30}/></div>
-          <h1>Planner</h1>
+          <h1>Rytmo</h1>
           <p>Monte sua rotina e mantenha ela com consistência.</p>
         </motion.div>
         <div className="feature-grid">
-          <Feature icon={<Check/>} title="Hábitos diários" text="Marque seu progresso sem distrações." />
-          <Feature icon={<Flame/>} title="Sequência" text="Acompanhe consistência e evolução." />
-          <Feature icon={<Lock/>} title="Privacidade" text="Dados locais nesta versão MVP." />
+          <Feature icon={<Check/>} title="Rotinas diárias" text="Marque seu progresso sem distrações." />
+          <Feature icon={<Flame/>} title="Sequência" text="Acompanhe sua consistência e evolução." />
+          <Feature icon={<Lock/>} title="Segurança" text="Não se perca em seus compromissos." />
         </div>
       </section>
 
-      <motion.form initial={{ opacity: 0, scale: .97 }} animate={{ opacity: 1, scale: 1 }} className="auth-card" onSubmit={(e) => { e.preventDefault(); onSubmit({ name, email, password }); }}>
-        <h2>{isRegister ? 'Criar conta' : 'Entrar'}</h2>
-        <p>{isRegister ? 'Comece a organizar seus hábitos hoje.' : 'Acesse seu painel minimalista.'}</p>
+      <motion.form
+  initial={{ opacity: 0, scale: .97 }}
+  animate={{ opacity: 1, scale: 1 }}
+  className="auth-card"
+
+  onSubmit={async (e) => {
+
+    e.preventDefault();
+
+    await onSubmit({
+
+      name,
+
+      email,
+
+      password
+
+    });
+
+  }}
+
+> 
+<h2>{isRegister ? 'Criar conta' : 'Entrar'}</h2>
+        <p>{isRegister ? 'Comece a organizar sua rotina hoje.' : 'Acesse seu painel.'}</p>
         {isRegister && <label><User size={18}/><input required placeholder="Seu nome" value={name} onChange={e => setName(e.target.value)} /></label>}
-        <label><Mail size={18}/><input required type="email" placeholder="seuemail@exemplo.com" value={email} onChange={e => setEmail(e.target.value)} /></label>
+        <label><Mail size={18}/><input required type="email" placeholder="seuemail@email.com" value={email} onChange={e => setEmail(e.target.value)} /></label>
         <label><Lock size={18}/><input required type="password" placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)} /></label>
         <button className="primary">{isRegister ? 'Criar minha conta' : 'Entrar no painel'}</button>
         <div className="auth-links">
@@ -242,7 +348,7 @@ function Auth({ mode, onSubmit, navigate }) {
 function Forgot({ navigate }) {
   return <main className="auth-page single"><form className="auth-card" onSubmit={(e) => e.preventDefault()}>
     <h2>Recuperar senha</h2><p>Informe seu e-mail.</p>
-    <label><Mail size={18}/><input type="email" placeholder="seuemail@exemplo.com" /></label>
+    <label><Mail size={18}/><input type="email" placeholder="seuemail@email.com" /></label>
     <button className="primary">Enviar instruções</button>
     <div className="auth-links"><button type="button" onClick={() => navigate('login')}>Voltar ao login</button></div>
   </form></main>;
@@ -251,16 +357,49 @@ function Forgot({ navigate }) {
 function Shell({ user, route, navigate, logout, sidebarOpen, setSidebarOpen, children }) {
   const items = [
     ['dashboard', LayoutDashboard, 'Dashboard'],
-    ['habits', CheckCircle2, 'Hábitos'],
-    ['analytics', BarChart3, 'Analytics'],
-    ['billing', Crown, 'Planos'],
+    ['habits', CheckCircle2, 'Rotina'],
+    ['analytics', BarChart3, 'Progresso'],
+    ['billing', Crown, 'Assinatura'],
     ['settings', Settings, 'Configurações']
   ];
 
   return (
     <main className="app-shell">
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="side-head"><div className="nav-brand"><Target size={22}/> Planner</div><button className="icon-btn mobile-only" onClick={() => setSidebarOpen(false)}><X size={18}/></button></div>
+        <div className="side-head">
+
+<div className="rytmo-brand">
+
+<div className="logo-orb"/>
+
+<div>
+
+<strong>
+
+RYTMO
+
+</strong>
+
+<small>
+
+Daily OS
+
+</small>
+
+</div>
+
+</div>
+
+<button
+ className="icon-btn mobile-only"
+ onClick={() => setSidebarOpen(false)}
+>
+
+<X size={18}/>
+
+</button>
+
+</div>
         <div className="side-menu">
           {items.map(([key, Icon, label]) => <button key={key} className={route === key ? 'active' : ''} onClick={() => navigate(key)}><Icon size={18}/>{label}<ChevronRight size={16}/></button>)}
         </div>
@@ -281,7 +420,7 @@ function Dashboard({ user, habits, setHabits }) {
 const filteredHabits = habits.filter(habit => {
 
   const habitDate =
-    habit.date || todayKey();
+    habit.task_date || todayKey();
 
   return habitDate === selectedDate;
 
@@ -291,22 +430,28 @@ const filteredHabits = habits.filter(habit => {
 
   return (
     <section>
-      <div className="welcome">
-        <div>
-          <span>Bem-vindo de volta</span>
-          <h1>Seu painel</h1>
-          <p>Escolha o dia e acompanhe os hábitos cadastrados.</p>
-        </div>
+      <div className="welcome premium-hero">
+  <div>
+    <span className="hero-kicker">RYTMO • Daily OS</span>
 
-        <div className="date-pill">
-          <CalendarDays size={18}/>
-          {new Date(selectedDate).toLocaleDateString('pt-BR', {
-            weekday: 'long',
-            day: '2-digit',
-            month: 'long'
-          })}
-        </div>
-      </div>
+    <h1>
+      Bem-vindo, {user?.name?.split(" ")[0]}
+    </h1>
+
+    <p>
+      Construa consistência, acompanhe sua evolução e transforme rotina em progresso.
+    </p>
+  </div>
+
+  <div className="date-pill premium-date">
+    <CalendarDays size={18}/>
+    {new Date(selectedDate).toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long'
+    })}
+  </div>
+</div>
 
       <div className="week-selector">
         {weekDates.map(day => (
@@ -346,13 +491,13 @@ function HabitsPage({ habits, setHabits }) {
   const weekDates = getWeekDates();
 
   const filteredHabits = habits.filter(habit => {
-    return !habit.date || habit.date === selectedDate;
+    return !habit.task_date || habit.task_date === selectedDate;
   });
 
   return (
     <section>
       <PageHeader
-        title="Hábitos"
+        title="Rotina"
         text="Escolha uma data e veja as tarefas daquele dia."
       />
 
@@ -370,7 +515,7 @@ function HabitsPage({ habits, setHabits }) {
       </div>
 
       <h2 className="section-title">
-        Hábitos de {new Date(selectedDate).toLocaleDateString('pt-BR', {
+        Rotina de {new Date(selectedDate).toLocaleDateString('pt-BR', {
           day: '2-digit',
           month: 'long'
         })}
@@ -469,6 +614,26 @@ function SettingsPage({ user, setUser }) {
 
 function useStats(habits){
 
+const streak = Object.values(
+ habits.flatMap(
+  h=>Object.keys(
+   h.history||{}
+  )
+ )
+).length;
+
+const streak =
+  habits.reduce((total, habit) => {
+    return total + Object.values(habit.history || {}).filter(Boolean).length;
+  }, 0);
+
+
+<Stat
+ icon={<Flame/>}
+ label="Sequência"
+ value={stats.streak}
+/>
+
  return useMemo(()=>{
 
   const today=todayKey();
@@ -510,7 +675,8 @@ function useStats(habits){
    total:habits.length,
    doneToday,
    percent,
-   weekly
+   weekly,
+   streak
   };
 
  },[habits]);
@@ -518,68 +684,134 @@ function useStats(habits){
 }
 
 function StatsGrid({ stats }) {
-  return <div className="stats"><Stat icon={<Target/>} label="Hábitos" value={stats.total} /><Stat icon={<Check/>} label="Concluídos hoje" value={stats.doneToday} /><Stat icon={<BarChart3/>} label="Progresso" value={`${stats.percent}%`} /></div>;
+  return (
+    <div className="stats">
+      <Stat icon={<Target/>} label="Rotinas" value={stats.total} />
+      <Stat icon={<Check/>} label="Concluídas hoje" value={stats.doneToday} />
+      <Stat icon={<BarChart3/>} label="Progresso" value={`${stats.percent}%`} />
+      <Stat icon={<Flame/>} label="Consistência" value={stats.streak || 0} />
+    </div>
+  );
 }
 
 function NewHabit({ habits, setHabits, selectedDate }) {
   const [title, setTitle] = useState('');
   const [goal, setGoal] = useState('');
   const [category, setCategory] = useState('Rotina');
-  function addHabit(e) {
+
+  async function addHabit(e) {
     e.preventDefault();
+
     if (!title.trim()) return;
-    setHabits([
- {
-   id: crypto.randomUUID(),
 
-   date: selectedDate || todayKey(), 
+    const session = await supabase.auth.getUser();
+    const user = session.data.user;
 
-   title,
+    if (!user) {
+      alert("Você precisa estar logado.");
+      return;
+    }
 
-   goal: goal || 'Diário',
+    const payload = {
+      user_id: user.id,
+      title,
+      goal: goal || "Diário",
+      category,
+      task_date: selectedDate || todayKey()
+    };
 
-   category,
+    const { data, error } = await supabase
+      .from("habits")
+      .insert(payload)
+      .select()
+      .single();
 
-   days:{},
+    if (error) {
+      console.log(error);
+      alert(error.message);
+      return;
+    }
 
-   history:{},
+    setHabits([data, ...habits]);
 
-   links:[],
-
-   files:[],
-
-   createdAt:new Date().toISOString()
-
- },
-
- ...habits
-
-]);
-    setTitle(''); setGoal(''); setCategory('Rotina');
+    setTitle("");
+    setGoal("");
+    setCategory("Rotina");
   }
-  return <form className="new-habit" onSubmit={addHabit}><h3>Novo hábito</h3><input placeholder="Ex: Ler 10 páginas" value={title} onChange={e => setTitle(e.target.value)} /><input placeholder="Meta: 20 min, 1h, 8 copos..." value={goal} onChange={e => setGoal(e.target.value)} /><input placeholder="Categoria" value={category} onChange={e => setCategory(e.target.value)} /><button className="primary"><Plus size={18}/>Adicionar</button></form>;
-}
 
+  return (
+    <form className="new-habit" onSubmit={addHabit}>
+      <h3>Novo hábito</h3>
+
+      <input
+        placeholder="Ex: Ler 10 páginas"
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+      />
+
+      <input
+        placeholder="Meta: 20 min, 1h, 8 copos..."
+        value={goal}
+        onChange={e => setGoal(e.target.value)}
+      />
+
+      <input
+        placeholder="Categoria"
+        value={category}
+        onChange={e => setCategory(e.target.value)}
+      />
+
+      <button className="primary">
+        <Plus size={18} />
+        Adicionar
+      </button>
+    </form>
+  );
+}
 function HabitList({ habits, allHabits, setHabits, limit }) {
   const today = todayKey();
   const visible = limit ? habits.slice(0, limit) : habits;
- function toggle(id){
+
+  async function toggle(id) {
+  const session = await supabase.auth.getUser();
+  const user = session.data.user;
+
+  if (!user) {
+    alert("Você precisa estar logado.");
+    return;
+  }
+
+  const habit = (allHabits || habits).find(h => h.id === id);
+
+  if (!habit) return;
+
+  const day = habit.task_date || todayKey();
+  const completed = !habit.history?.[day];
+
+  const { error } = await supabase
+    .from("habit_history")
+    .upsert({
+      habit_id: habit.id,
+      user_id: user.id,
+      completed_date: day,
+      completed
+    });
+
+  if (error) {
+    console.log(error);
+    alert(error.message);
+    return;
+  }
+
   const base = allHabits || habits;
 
   setHabits(
     base.map(h => {
-      if(h.id !== id) return h;
-
-      const day = h.date || today;
-      const completed = !h.days?.[day];
+      if (h.id !== id) return h;
 
       return {
         ...h,
-        days:{
-          ...h.days,
-          [day]: completed
-        },
-        history:{
+        history: {
           ...h.history,
           [day]: completed
         }
@@ -587,33 +819,50 @@ function HabitList({ habits, allHabits, setHabits, limit }) {
     })
   );
 }
-  function remove(id){
 
- const base=
-  allHabits || habits;
+  function remove(id) {
+    const base = allHabits || habits;
+    setHabits(base.filter(h => h.id !== id));
+  }
 
- setHabits(
+  if (!visible.length) {
+    return <div className="empty-card">Nenhum hábito criado ainda.</div>;
+  }
 
-  base.filter(
-   h=>h.id!==id
-  )
+  return (
+    <div className="habits-list">
+      <AnimatePresence>
+        {visible.map(h => {
+          const day = h.task_date || today;
+          const completed = h.history?.[day];
 
- );
+          return (
+            <motion.article
+              layout
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: .96 }}
+              key={h.id}
+              className={`habit ${completed ? 'active' : ''}`}
+            >
+              <button className="check" onClick={() => toggle(h.id)}>
+                {completed && <Check size={20} />}
+              </button>
 
-}
-  if (!visible.length) return <div className="empty-card">Nenhum hábito criado ainda.</div>;
-  return <div className="habits-list"><AnimatePresence>{visible.map(h => <motion.article layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: .96 }} key={h.id} className={`habit ${
- h.days?.[
-   h.date || today
- ]
- ? 'active'
- : ''
-}`}><button className="check" onClick={() => toggle(h.id)}>{
- h.days?.[
-  h.date || today
- ] &&
- <Check size={20}/>
-}</button><div><strong>{h.title}</strong><p>{h.category} • {h.goal}</p></div><button className="delete" onClick={() => remove(h.id)}><Trash2 size={18}/></button></motion.article>)}</AnimatePresence></div>;
+              <div>
+                <strong>{h.title}</strong>
+                <p>{h.category} • {h.goal}</p>
+              </div>
+
+              <button className="delete" onClick={() => remove(h.id)}>
+                <Trash2 size={18} />
+              </button>
+            </motion.article>
+          );
+        })}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 function Feature({ icon, title, text }) { return <div className="feature"><span>{icon}</span><strong>{title}</strong><p>{text}</p></div>; }
