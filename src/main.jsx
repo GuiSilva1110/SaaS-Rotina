@@ -9,10 +9,29 @@ import {
 import './styles.css';
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
+
+const formatKey = (date) => date.toISOString().slice(0, 10);
+
 const yesterdayKey = () => {
   const d = new Date();
   d.setDate(d.getDate() - 1);
   return d.toISOString().slice(0, 10);
+};
+
+
+const getWeekDates = () => {
+  const today = new Date();
+
+  return Array.from({ length: 7 }).map((_, index) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - today.getDay() + 1 + index);
+
+    return {
+      key: formatKey(d),
+      day: d.getDate(),
+      label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase()
+    };
+  });
 };
 
 function load(key, fallback) {
@@ -29,9 +48,61 @@ function save(key, value) {
 }
 
 const starterHabits = [
-  { id: crypto.randomUUID(), title: 'Beber água', category: 'Saúde', goal: '8 copos', days: {} },
-  { id: crypto.randomUUID(), title: 'Estudar programação', category: 'Carreira', goal: '1 hora', days: {} },
-  { id: crypto.randomUUID(), title: 'Treino', category: 'Corpo', goal: '30 min', days: {} }
+
+{
+ id:crypto.randomUUID(),
+
+ title:'Beber água',
+
+ category:'Saúde',
+
+ goal:'8 copos',
+
+ days:{},
+
+ history:{},
+
+ links:[],
+
+ files:[]
+},
+
+{
+ id:crypto.randomUUID(),
+
+ title:'Estudar programação',
+
+ category:'Carreira',
+
+ goal:'1 hora',
+
+ days:{},
+
+ history:{},
+
+ links:[],
+
+ files:[]
+},
+
+{
+ id:crypto.randomUUID(),
+
+ title:'Treino',
+
+ category:'Corpo',
+
+ goal:'30 min',
+
+ days:{},
+
+ history:{},
+
+ links:[],
+
+ files:[]
+}
+
 ];
 
 function App() {
@@ -103,9 +174,12 @@ function Landing({ navigate, user }) {
 
       <section className="landing-hero">
         <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-          <span className="eyebrow"><Sparkles size={16}/> SaaS de hábitos minimalista</span>
-          <h1>Organize hábitos, acompanhe progresso e venda como assinatura.</h1>
-          <p>Uma base própria fora do Base44, com visual premium, dashboard, planos e estrutura preparada para Supabase, Vercel e cobrança recorrente.</p>
+          <span className="eyebrow"><Sparkles size={16}/> Mantenha sua rotina em dia </span>
+          <h1>Construa hábitos,
+  acompanhe progresso
+  e mantenha consistência.</h1>
+          <p>Crie rotinas, acompanhe evolução e visualize seu progresso
+  em um painel simples e elegante.</p>
           <div className="hero-actions">
             <button className="primary inline" onClick={() => navigate(user ? 'dashboard' : 'register')}>Começar agora <ArrowRight size={18}/></button>
             <button className="secondary" onClick={() => navigate('login')}>Ver demo</button>
@@ -140,8 +214,8 @@ function Auth({ mode, onSubmit, navigate }) {
       <section className="hero-card">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="brand">
           <div className="logo"><Target size={30}/></div>
-          <h1>Planner Minimalista</h1>
-          <p>Um rastreador de hábitos simples, elegante e pronto para evoluir para SaaS com login real, pagamentos e dashboard profissional.</p>
+          <h1>Planner</h1>
+          <p>Monte sua rotina e mantenha ela com consistência.</p>
         </motion.div>
         <div className="feature-grid">
           <Feature icon={<Check/>} title="Hábitos diários" text="Marque seu progresso sem distrações." />
@@ -167,7 +241,7 @@ function Auth({ mode, onSubmit, navigate }) {
 
 function Forgot({ navigate }) {
   return <main className="auth-page single"><form className="auth-card" onSubmit={(e) => e.preventDefault()}>
-    <h2>Recuperar senha</h2><p>Informe seu e-mail. Na versão com Supabase, enviaremos o link de recuperação automaticamente.</p>
+    <h2>Recuperar senha</h2><p>Informe seu e-mail.</p>
     <label><Mail size={18}/><input type="email" placeholder="seuemail@exemplo.com" /></label>
     <button className="primary">Enviar instruções</button>
     <div className="auth-links"><button type="button" onClick={() => navigate('login')}>Voltar ao login</button></div>
@@ -201,29 +275,178 @@ function Shell({ user, route, navigate, logout, sidebarOpen, setSidebarOpen, chi
 }
 
 function Dashboard({ user, habits, setHabits }) {
-  const stats = useStats(habits);
+  const [selectedDate, setSelectedDate] = useState(todayKey());
+
+  const weekDates = getWeekDates();
+const filteredHabits = habits.filter(habit => {
+
+  const habitDate =
+    habit.date || todayKey();
+
+  return habitDate === selectedDate;
+
+});
+
+  const stats = useStats(filteredHabits);
+
   return (
     <section>
       <div className="welcome">
-        <div><span>Bem-vindo de volta</span><h1>Seu painel</h1><p>Hoje é um ótimo dia para manter a consistência.</p></div>
-        <div className="date-pill"><CalendarDays size={18}/>{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</div>
+        <div>
+          <span>Bem-vindo de volta</span>
+          <h1>Seu painel</h1>
+          <p>Escolha o dia e acompanhe os hábitos cadastrados.</p>
+        </div>
+
+        <div className="date-pill">
+          <CalendarDays size={18}/>
+          {new Date(selectedDate).toLocaleDateString('pt-BR', {
+            weekday: 'long',
+            day: '2-digit',
+            month: 'long'
+          })}
+        </div>
       </div>
+
+      <div className="week-selector">
+        {weekDates.map(day => (
+          <button
+            key={day.key}
+            className={selectedDate === day.key ? "active" : ""}
+            onClick={() => setSelectedDate(day.key)}
+          >
+            <span>{day.label}</span>
+            <strong>{day.day}</strong>
+          </button>
+        ))}
+      </div>
+
       <StatsGrid stats={stats} />
+
       <div className="content-grid">
-        <NewHabit habits={habits} setHabits={setHabits} />
-        <HabitList habits={habits} setHabits={setHabits} limit={5} />
+        <NewHabit
+          habits={habits}
+          setHabits={setHabits}
+          selectedDate={selectedDate}
+        />
+
+        <HabitList
+          habits={filteredHabits}
+          allHabits={habits}
+          setHabits={setHabits}
+          limit={5}
+        />
       </div>
     </section>
   );
 }
 
 function HabitsPage({ habits, setHabits }) {
-  return <section><PageHeader title="Hábitos" text="Gerencie todos os seus hábitos e marque o que já foi feito hoje." /><div className="content-grid"><NewHabit habits={habits} setHabits={setHabits} /><HabitList habits={habits} setHabits={setHabits} /></div></section>;
+  const [selectedDate, setSelectedDate] = useState(todayKey());
+  const weekDates = getWeekDates();
+
+  const filteredHabits = habits.filter(habit => {
+    return !habit.date || habit.date === selectedDate;
+  });
+
+  return (
+    <section>
+      <PageHeader
+        title="Hábitos"
+        text="Escolha uma data e veja as tarefas daquele dia."
+      />
+
+      <div className="week-selector">
+        {weekDates.map(day => (
+          <button
+            key={day.key}
+            className={selectedDate === day.key ? "active" : ""}
+            onClick={() => setSelectedDate(day.key)}
+          >
+            <span>{day.label}</span>
+            <strong>{day.day}</strong>
+          </button>
+        ))}
+      </div>
+
+      <h2 className="section-title">
+        Hábitos de {new Date(selectedDate).toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'long'
+        })}
+      </h2>
+
+      <div className="content-grid">
+        <NewHabit
+          habits={habits}
+          setHabits={setHabits}
+          selectedDate={selectedDate}
+        />
+
+        <HabitList
+          habits={filteredHabits}
+          setHabits={setHabits}
+        />
+      </div>
+    </section>
+  );
 }
 
 function AnalyticsPage({ habits }) {
+
   const stats = useStats(habits);
-  return <section><PageHeader title="Analytics" text="Métricas simples para acompanhar sua evolução." /><StatsGrid stats={stats} /><div className="analytics-card"><h3>Resumo semanal</h3><div className="bars">{[40, 70, 55, 90, 65, 78, stats.percent].map((v, i) => <div key={i}><span style={{ height: `${Math.max(v, 8)}%` }}></span><small>{['S','T','Q','Q','S','S','D'][i]}</small></div>)}</div></div></section>;
+
+  return (
+
+    <section>
+
+      <PageHeader
+
+        title="Analytics"
+
+        text="Métricas simples para acompanhar sua evolução."
+
+      />
+
+      <StatsGrid stats={stats} />
+
+      <div className="analytics-card">
+
+        <h3>Resumo semanal</h3>
+
+        <div className="bars">
+
+          {stats.weekly.map((item,i)=>(
+
+            <div key={i}>
+
+              <span
+                style={{
+                  height:
+                  `${Math.max(item.completed*20,8)}%`
+                }}
+              />
+
+              <small>
+
+                {
+                  item.label
+                }
+
+              </small>
+
+            </div>
+
+          ))}
+
+        </div>
+
+      </div>
+
+    </section>
+
+  );
+
 }
 
 function BillingPage({ user, setUser }) {
@@ -244,41 +467,153 @@ function SettingsPage({ user, setUser }) {
   return <section><PageHeader title="Configurações" text="Preferências da conta e do produto." /><form className="settings-card" onSubmit={saveProfile}><label>Nome<input value={name} onChange={e => setName(e.target.value)} /></label><label>Email<input value={user.email} disabled /></label><button className="primary inline">Salvar alterações</button></form></section>;
 }
 
-function useStats(habits) {
-  return useMemo(() => {
-    const today = todayKey();
-    const yesterday = yesterdayKey();
-    const doneToday = habits.filter(h => h.days?.[today]).length;
-    const doneYesterday = habits.filter(h => h.days?.[yesterday]).length;
-    const percent = habits.length ? Math.round((doneToday / habits.length) * 100) : 0;
-    return { total: habits.length, doneToday, percent, streak: doneToday > 0 && doneYesterday > 0 ? 2 : doneToday > 0 ? 1 : 0 };
-  }, [habits]);
+function useStats(habits){
+
+ return useMemo(()=>{
+
+  const today=todayKey();
+
+  const doneToday =
+   habits.filter(h=>h.history?.[today]).length;
+
+  const week=[];
+
+  for(let i=6;i>=0;i--){
+
+   const d=new Date();
+   d.setDate(d.getDate()-i);
+
+   const key=d.toISOString().slice(0,10);
+
+   const label=d.toLocaleDateString(
+    'pt-BR',
+    { weekday:'short' }
+   ).replace('.','');
+
+   week.push({ key, label });
+
+  }
+
+  const weekly = week.map(day=>({
+   label: day.label,
+   completed: habits.filter(
+    h=>h.history?.[day.key]
+   ).length
+  }));
+
+  const percent =
+   habits.length
+   ? Math.round((doneToday / habits.length) * 100)
+   : 0;
+
+  return{
+   total:habits.length,
+   doneToday,
+   percent,
+   weekly
+  };
+
+ },[habits]);
+
 }
 
 function StatsGrid({ stats }) {
   return <div className="stats"><Stat icon={<Target/>} label="Hábitos" value={stats.total} /><Stat icon={<Check/>} label="Concluídos hoje" value={stats.doneToday} /><Stat icon={<BarChart3/>} label="Progresso" value={`${stats.percent}%`} /></div>;
 }
 
-function NewHabit({ habits, setHabits }) {
+function NewHabit({ habits, setHabits, selectedDate }) {
   const [title, setTitle] = useState('');
   const [goal, setGoal] = useState('');
   const [category, setCategory] = useState('Rotina');
   function addHabit(e) {
     e.preventDefault();
     if (!title.trim()) return;
-    setHabits([{ id: crypto.randomUUID(), title, goal: goal || 'Diário', category, days: {} }, ...habits]);
+    setHabits([
+ {
+   id: crypto.randomUUID(),
+
+   date: selectedDate || todayKey(), 
+
+   title,
+
+   goal: goal || 'Diário',
+
+   category,
+
+   days:{},
+
+   history:{},
+
+   links:[],
+
+   files:[],
+
+   createdAt:new Date().toISOString()
+
+ },
+
+ ...habits
+
+]);
     setTitle(''); setGoal(''); setCategory('Rotina');
   }
   return <form className="new-habit" onSubmit={addHabit}><h3>Novo hábito</h3><input placeholder="Ex: Ler 10 páginas" value={title} onChange={e => setTitle(e.target.value)} /><input placeholder="Meta: 20 min, 1h, 8 copos..." value={goal} onChange={e => setGoal(e.target.value)} /><input placeholder="Categoria" value={category} onChange={e => setCategory(e.target.value)} /><button className="primary"><Plus size={18}/>Adicionar</button></form>;
 }
 
-function HabitList({ habits, setHabits, limit }) {
+function HabitList({ habits, allHabits, setHabits, limit }) {
   const today = todayKey();
   const visible = limit ? habits.slice(0, limit) : habits;
-  function toggle(id) { setHabits(habits.map(h => h.id === id ? { ...h, days: { ...h.days, [today]: !h.days?.[today] } } : h)); }
-  function remove(id) { setHabits(habits.filter(h => h.id !== id)); }
+ function toggle(id){
+  const base = allHabits || habits;
+
+  setHabits(
+    base.map(h => {
+      if(h.id !== id) return h;
+
+      const day = h.date || today;
+      const completed = !h.days?.[day];
+
+      return {
+        ...h,
+        days:{
+          ...h.days,
+          [day]: completed
+        },
+        history:{
+          ...h.history,
+          [day]: completed
+        }
+      };
+    })
+  );
+}
+  function remove(id){
+
+ const base=
+  allHabits || habits;
+
+ setHabits(
+
+  base.filter(
+   h=>h.id!==id
+  )
+
+ );
+
+}
   if (!visible.length) return <div className="empty-card">Nenhum hábito criado ainda.</div>;
-  return <div className="habits-list"><AnimatePresence>{visible.map(h => <motion.article layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: .96 }} key={h.id} className={`habit ${h.days?.[today] ? 'active' : ''}`}><button className="check" onClick={() => toggle(h.id)}>{h.days?.[today] && <Check size={20}/>}</button><div><strong>{h.title}</strong><p>{h.category} • {h.goal}</p></div><button className="delete" onClick={() => remove(h.id)}><Trash2 size={18}/></button></motion.article>)}</AnimatePresence></div>;
+  return <div className="habits-list"><AnimatePresence>{visible.map(h => <motion.article layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: .96 }} key={h.id} className={`habit ${
+ h.days?.[
+   h.date || today
+ ]
+ ? 'active'
+ : ''
+}`}><button className="check" onClick={() => toggle(h.id)}>{
+ h.days?.[
+  h.date || today
+ ] &&
+ <Check size={20}/>
+}</button><div><strong>{h.title}</strong><p>{h.category} • {h.goal}</p></div><button className="delete" onClick={() => remove(h.id)}><Trash2 size={18}/></button></motion.article>)}</AnimatePresence></div>;
 }
 
 function Feature({ icon, title, text }) { return <div className="feature"><span>{icon}</span><strong>{title}</strong><p>{text}</p></div>; }
