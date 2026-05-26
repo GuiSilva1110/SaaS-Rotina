@@ -1,0 +1,30 @@
+{
+  "name": "planner-minimalista-saas",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.4.0",
+    "@supabase/auth-ui-react": "^0.4.7",
+    "@supabase/supabase-js": "^2.106.2",
+    "@tanstack/react-query": "^5.100.14",
+    "@vitejs/plugin-react": "latest",
+    "date-fns": "^4.3.0",
+    "framer-motion": "^12.40.0",
+    "lucide-react": "^1.16.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-hook-form": "^7.76.1",
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^7.15.1",
+    "recharts": "^3.8.1",
+    "uuid": "^14.0.0",
+    "vite": "latest",
+    "zod": "^4.4.3"
+  }
+}
