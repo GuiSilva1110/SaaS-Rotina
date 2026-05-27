@@ -119,37 +119,68 @@ useEffect(() => {
   }
 }, [user]);
 
+
   async function loadHabits() {
-  const session = await supabase.auth.getUser();
-  const currentUser = session.data.user;
+
+  const session =
+    await supabase.auth.getUser();
+
+  const currentUser =
+    session.data.user;
 
   if (!currentUser) return;
 
-  const { data: habitsData, error: habitsError } = await supabase
-    .from("habits")
-    .select("*")
-    .eq("user_id", currentUser.id)
-    .order("created_at", { ascending: false });
+  const { data: habitsData, error: habitsError } =
+    await supabase
+      .from("habits")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .order("created_at", { ascending: false });
 
   if (habitsError) {
     console.log(habitsError);
     return;
   }
 
-  const { data: historyData, error: historyError } = await supabase
-    .from("habit_history")
-    .select("*")
-    .eq("user_id", currentUser.id);
+  const { data: historyData, error: historyError } =
+    await supabase
+      .from("habit_history")
+      .select("*")
+      .eq("user_id", currentUser.id);
 
   if (historyError) {
     console.log(historyError);
     return;
   }
 
+  const { data: linksData, error: linksError } =
+    await supabase
+      .from("habit_links")
+      .select("*")
+      .eq("user_id", currentUser.id);
+
+  if (linksError) {
+    console.log(linksError);
+    return;
+  }
+
+  const { data: filesData, error: filesError } =
+    await supabase
+      .from("habit_files")
+      .select("*")
+      .eq("user_id", currentUser.id);
+
+  if (filesError) {
+    console.log(filesError);
+    return;
+  }
+
   const habitsWithHistory = (habitsData || []).map((habit) => {
-    const habitHistory = (historyData || []).filter(
-      (item) => item.habit_id === habit.id
-    );
+
+    const habitHistory =
+      (historyData || []).filter(
+        item => item.habit_id === habit.id
+      );
 
     const history = {};
 
@@ -157,13 +188,27 @@ useEffect(() => {
       history[item.completed_date] = item.completed;
     });
 
+    const links =
+      (linksData || []).filter(
+        item => item.habit_id === habit.id
+      );
+
+    const files =
+      (filesData || []).filter(
+        item => item.habit_id === habit.id
+      );
+
     return {
       ...habit,
-      history
+      history,
+      links,
+      files
     };
+
   });
 
   setHabits(habitsWithHistory);
+
 }
   function navigate(next) {
     setRoute(next);
@@ -214,11 +259,12 @@ useEffect(() => {
   save("planner:user", currentUser);
   navigate("dashboard");
 }
-  function logout() {
-    localStorage.removeItem('planner:user');
-    setUser(null);
-    navigate('landing');
-  }
+  async function logout() {
+  await supabase.auth.signOut();
+  localStorage.removeItem('planner:user');
+  setUser(null);
+  navigate('landing');
+}
 
   function updateHabits(next) {
     setHabits(next);
@@ -406,7 +452,7 @@ Daily OS
         <div className="side-user"><small>Plano atual</small><strong>{user.plan === 'pro' ? 'Pro' : 'Free'}</strong><button className="ghost" onClick={logout}>Sair</button></div>
       </aside>
       <section className="main-area">
-        <nav className="topbar"><button className="icon-btn mobile-only" onClick={() => setSidebarOpen(true)}><Menu size={20}/></button><div><strong>{user.name}</strong><span>{user.email}</span></div></nav>
+        <nav className="topbar"><button className="icon-btn mobile-only" onClick={() => setSidebarOpen(true)}><Menu size={20}/></button><div><strong>{user.name}</strong></div></nav>
         {children}
       </section>
     </main>
@@ -415,7 +461,7 @@ Daily OS
 
 function Dashboard({ user, habits, setHabits }) {
   const [selectedDate, setSelectedDate] = useState(todayKey());
-
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const weekDates = getWeekDates();
 const filteredHabits = habits.filter(habit => {
 
@@ -443,15 +489,45 @@ const filteredHabits = habits.filter(habit => {
     </p>
   </div>
 
-  <div className="date-pill premium-date">
+  <div className="dashboard-actions">
+
+  <button
+    className="date-pill premium-date date-button"
+    onClick={() => setCalendarOpen(!calendarOpen)}
+  >
     <CalendarDays size={18}/>
+
     {new Date(selectedDate).toLocaleDateString('pt-BR', {
       weekday: 'long',
       day: '2-digit',
       month: 'long'
     })}
-  </div>
+  </button>
+
 </div>
+</div>
+{calendarOpen && (
+
+  <div className="calendar-panel">
+
+    <label>
+
+      Escolha uma data
+
+      <input
+        type="date"
+        value={selectedDate}
+        onChange={(e) => {
+          setSelectedDate(e.target.value);
+          setCalendarOpen(false);
+        }}
+      />
+
+    </label>
+
+  </div>
+
+)}
 
       <div className="week-selector">
         {weekDates.map(day => (
@@ -467,6 +543,7 @@ const filteredHabits = habits.filter(habit => {
       </div>
 
       <StatsGrid stats={stats} />
+      <HeatmapCard habits={habits} />
 
       <div className="content-grid">
         <NewHabit
@@ -488,6 +565,7 @@ const filteredHabits = habits.filter(habit => {
 
 function HabitsPage({ habits, setHabits }) {
   const [selectedDate, setSelectedDate] = useState(todayKey());
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const weekDates = getWeekDates();
 
   const filteredHabits = habits.filter(habit => {
@@ -500,6 +578,39 @@ function HabitsPage({ habits, setHabits }) {
         title="Rotina"
         text="Escolha uma data e veja as tarefas daquele dia."
       />
+
+      <div className="dashboard-actions page-actions">
+
+  <button
+    className="calendar-toggle"
+    onClick={() => setCalendarOpen(!calendarOpen)}
+  >
+  </button>
+
+</div>
+
+{calendarOpen && (
+
+  <div className="calendar-panel">
+
+    <label>
+
+      Escolha uma data
+
+      <input
+        type="date"
+        value={selectedDate}
+        onChange={(e) => {
+          setSelectedDate(e.target.value);
+          setCalendarOpen(false);
+        }}
+      />
+
+    </label>
+
+  </div>
+
+)}
 
       <div className="week-selector">
         {weekDates.map(day => (
@@ -529,11 +640,69 @@ function HabitsPage({ habits, setHabits }) {
         />
 
         <HabitList
-          habits={filteredHabits}
-          setHabits={setHabits}
-        />
+  habits={filteredHabits}
+  allHabits={habits}
+  setHabits={setHabits}
+/>
       </div>
     </section>
+  );
+}
+
+function HeatmapCard({ habits }) {
+  const days = [];
+
+  for (let i = 27; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+
+    const key = d.toISOString().slice(0, 10);
+
+    const completed = habits.some(
+      habit => habit.history?.[key]
+    );
+
+    days.push({
+      key,
+      completed,
+      label: d.toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit"
+      })
+    });
+  }
+
+  const completedDays = days.filter(day => day.completed).length;
+
+  const consistency = Math.round(
+    (completedDays / days.length) * 100
+  );
+
+  return (
+    <div className="heatmap-card">
+      <div className="heatmap-head">
+        <div>
+          <span>Consistency</span>
+          <h3>Seu ritmo dos últimos 28 dias</h3>
+        </div>
+
+        <strong>{consistency}%</strong>
+      </div>
+
+      <div className="heatmap-grid">
+        {days.map(day => (
+          <div
+            key={day.key}
+            className={`heatmap-cell ${day.completed ? "done" : ""}`}
+            title={`${day.label} • ${day.completed ? "Concluído" : "Sem rotina"}`}
+          />
+        ))}
+      </div>
+
+      <p>
+        Cada ponto representa um dia com pelo menos uma rotina concluída.
+      </p>
+    </div>
   );
 }
 
@@ -554,6 +723,7 @@ function AnalyticsPage({ habits }) {
       />
 
       <StatsGrid stats={stats} />
+      <HeatmapCard habits={habits} />
 
       <div className="analytics-card">
 
@@ -612,75 +782,53 @@ function SettingsPage({ user, setUser }) {
   return <section><PageHeader title="Configurações" text="Preferências da conta e do produto." /><form className="settings-card" onSubmit={saveProfile}><label>Nome<input value={name} onChange={e => setName(e.target.value)} /></label><label>Email<input value={user.email} disabled /></label><button className="primary inline">Salvar alterações</button></form></section>;
 }
 
-function useStats(habits){
+function useStats(habits) {
+  return useMemo(() => {
+    const today = todayKey();
 
-const streak = Object.values(
- habits.flatMap(
-  h=>Object.keys(
-   h.history||{}
-  )
- )
-).length;
+    const doneToday =
+      habits.filter(h => h.history?.[today]).length;
 
-const streak =
-  habits.reduce((total, habit) => {
-    return total + Object.values(habit.history || {}).filter(Boolean).length;
-  }, 0);
+    const week = [];
 
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
 
-<Stat
- icon={<Flame/>}
- label="Sequência"
- value={stats.streak}
-/>
+      const key = d.toISOString().slice(0, 10);
 
- return useMemo(()=>{
+      const label = d
+        .toLocaleDateString("pt-BR", { weekday: "short" })
+        .replace(".", "");
 
-  const today=todayKey();
+      week.push({ key, label });
+    }
 
-  const doneToday =
-   habits.filter(h=>h.history?.[today]).length;
+    const weekly = week.map(day => ({
+      label: day.label,
+      completed: habits.filter(
+        h => h.history?.[day.key]
+      ).length
+    }));
 
-  const week=[];
+    const percent =
+      habits.length
+        ? Math.round((doneToday / habits.length) * 100)
+        : 0;
 
-  for(let i=6;i>=0;i--){
+    const streak =
+      habits.reduce((total, habit) => {
+        return total + Object.values(habit.history || {}).filter(Boolean).length;
+      }, 0);
 
-   const d=new Date();
-   d.setDate(d.getDate()-i);
-
-   const key=d.toISOString().slice(0,10);
-
-   const label=d.toLocaleDateString(
-    'pt-BR',
-    { weekday:'short' }
-   ).replace('.','');
-
-   week.push({ key, label });
-
-  }
-
-  const weekly = week.map(day=>({
-   label: day.label,
-   completed: habits.filter(
-    h=>h.history?.[day.key]
-   ).length
-  }));
-
-  const percent =
-   habits.length
-   ? Math.round((doneToday / habits.length) * 100)
-   : 0;
-
-  return{
-   total:habits.length,
-   doneToday,
-   percent,
-   weekly,
-   streak
-  };
-
- },[habits]);
-
+    return {
+      total: habits.length,
+      doneToday,
+      percent,
+      weekly,
+      streak
+    };
+  }, [habits]);
 }
 
 function StatsGrid({ stats }) {
@@ -741,12 +889,18 @@ function NewHabit({ habits, setHabits, selectedDate }) {
 
   return (
     <form className="new-habit" onSubmit={addHabit}>
-      <h3>Novo hábito</h3>
+      <h3>Nova rotina</h3>
 
       <input
         placeholder="Ex: Ler 10 páginas"
         value={title}
         onChange={e => setTitle(e.target.value)}
+        onKeyDown={(e) =>{
+          if (e.key === "Enter"){
+            e.preventDefault();
+            e.currentTarget.form.requestSubmit();
+          }
+        }}
       />
 
       <input
@@ -761,18 +915,74 @@ function NewHabit({ habits, setHabits, selectedDate }) {
         onChange={e => setCategory(e.target.value)}
       />
 
-      <button className="primary">
-        <Plus size={18} />
-        Adicionar
-      </button>
+      <button type="submit" className="primary">
+  <Plus size={18} />
+  Adicionar
+</button>
     </form>
   );
 }
 function HabitList({ habits, allHabits, setHabits, limit }) {
   const today = todayKey();
   const visible = limit ? habits.slice(0, limit) : habits;
+  const [linkingId, setLinkingId] = useState(null);
+  const [uploadingId, setUploadingId] = useState(null);
 
-  async function toggle(id) {
+const [linkUrl, setLinkUrl] = useState("");
+
+const [linkLabel, setLinkLabel] = useState("");
+
+  const [editingId, setEditingId] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editGoal, setEditGoal] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+
+  function startEdit(habit) {
+    setEditingId(habit.id);
+    setEditTitle(habit.title || "");
+    setEditGoal(habit.goal || "Diário");
+    setEditCategory(habit.category || "Rotina");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+  }
+
+  async function saveEdit(habit) {
+    if (!editTitle.trim()) return;
+
+    const { data, error } = await supabase
+      .from("habits")
+      .update({
+        title: editTitle.trim(),
+        goal: editGoal.trim() || "Diário",
+        category: editCategory.trim() || "Rotina"
+      })
+      .eq("id", habit.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.log(error);
+      alert(error.message);
+      return;
+    }
+
+    const base = allHabits || habits;
+
+    setHabits(
+      base.map(h => {
+        if (h.id !== habit.id) return h;
+        return { ...h, ...data };
+      })
+    );
+
+    cancelEdit();
+  }
+
+  async function uploadFile(habitId, file) {
+  if (!file) return;
+
   const session = await supabase.auth.getUser();
   const user = session.data.user;
 
@@ -781,25 +991,41 @@ function HabitList({ habits, allHabits, setHabits, limit }) {
     return;
   }
 
-  const habit = (allHabits || habits).find(h => h.id === id);
+  setUploadingId(habitId);
 
-  if (!habit) return;
+  const filePath = `${user.id}/${habitId}/${Date.now()}-${file.name}`;
 
-  const day = habit.task_date || todayKey();
-  const completed = !habit.history?.[day];
+  const { error: uploadError } = await supabase.storage
+    .from("habit-files")
+    .upload(filePath, file);
 
-  const { error } = await supabase
-    .from("habit_history")
-    .upsert({
-      habit_id: habit.id,
+  if (uploadError) {
+    console.log(uploadError);
+    alert(uploadError.message);
+    setUploadingId(null);
+    return;
+  }
+
+  const { data: publicData } = supabase.storage
+    .from("habit-files")
+    .getPublicUrl(filePath);
+
+  const { data, error } = await supabase
+    .from("habit_files")
+    .insert({
+      habit_id: habitId,
       user_id: user.id,
-      completed_date: day,
-      completed
-    });
+      file_name: file.name,
+      file_url: publicData.publicUrl,
+      file_type: file.type
+    })
+    .select()
+    .single();
 
   if (error) {
     console.log(error);
     alert(error.message);
+    setUploadingId(null);
     return;
   }
 
@@ -807,62 +1033,384 @@ function HabitList({ habits, allHabits, setHabits, limit }) {
 
   setHabits(
     base.map(h => {
-      if (h.id !== id) return h;
+      if (h.id !== habitId) return h;
 
       return {
         ...h,
-        history: {
-          ...h.history,
-          [day]: completed
-        }
+        files: [...(h.files || []), data]
       };
     })
   );
+
+  setUploadingId(null);
 }
 
-  function remove(id) {
+  function startLink(habitId) {
+
+  setLinkingId(habitId);
+
+  setLinkUrl("");
+
+  setLinkLabel("");
+
+}
+
+function cancelLink() {
+
+  setLinkingId(null);
+
+}
+
+async function addLink(habitId) {
+
+  const session =
+    await supabase.auth.getUser();
+
+  const user =
+    session.data.user;
+
+  if(!user){
+
+    alert("Você precisa estar logado.");
+
+    return;
+
+  }
+
+  if(!linkUrl.trim())
+  return;
+
+  const { data,error } =
+
+  await supabase
+
+  .from("habit_links")
+
+  .insert({
+
+    habit_id:habitId,
+
+    user_id:user.id,
+
+    url:linkUrl,
+
+    label:linkLabel || "Link"
+
+  })
+
+  .select()
+
+  .single();
+
+  if(error){
+
+    console.log(error);
+
+    alert(error.message);
+
+    return;
+
+  }
+
+  const base =
+    allHabits || habits;
+
+  setHabits(
+
+    base.map(h=>{
+
+      if(h.id !== habitId)
+      return h;
+
+      return{
+
+        ...h,
+
+        links:[
+          ...(h.links || []),
+          data
+        ]
+
+      };
+
+    })
+
+  );
+
+  cancelLink();
+
+}
+
+  async function toggle(id) {
+    const session = await supabase.auth.getUser();
+    const user = session.data.user;
+
+    if (!user) {
+      alert("Você precisa estar logado.");
+      return;
+    }
+
+    const base = allHabits || habits;
+    const habit = base.find(h => h.id === id);
+
+    if (!habit) return;
+
+    const day = habit.task_date || today;
+    const completed = !habit.history?.[day];
+
+    const { error } = await supabase
+      .from("habit_history")
+      .upsert({
+        habit_id: habit.id,
+        user_id: user.id,
+        completed_date: day,
+        completed
+      });
+
+    if (error) {
+      console.log(error);
+      alert(error.message);
+      return;
+    }
+
+    setHabits(
+      base.map(h => {
+        if (h.id !== id) return h;
+
+        return {
+          ...h,
+          history: {
+            ...h.history,
+            [day]: completed
+          }
+        };
+      })
+    );
+  }
+
+  async function remove(id) {
+    const shouldDelete = window.confirm("Deseja excluir esta rotina?");
+
+    if (!shouldDelete) return;
+
+    const { error } = await supabase
+      .from("habits")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.log(error);
+      alert(error.message);
+      return;
+    }
+
     const base = allHabits || habits;
     setHabits(base.filter(h => h.id !== id));
   }
 
+  
   if (!visible.length) {
-    return <div className="empty-card">Nenhum hábito criado ainda.</div>;
+    return <div className="empty-card">Nenhuma rotina criada ainda.</div>;
   }
 
   return (
-    <div className="habits-list">
-      <AnimatePresence>
-        {visible.map(h => {
-          const day = h.task_date || today;
-          const completed = h.history?.[day];
+  <div className="habits-list">
+    <AnimatePresence>
+      {visible.map(h => {
+        const day = h.task_date || today;
+        const completed = h.history?.[day];
+        const isEditing = editingId === h.id;
+        const isLinking = linkingId === h.id;
 
-          return (
-            <motion.article
-              layout
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: .96 }}
-              key={h.id}
-              className={`habit ${completed ? 'active' : ''}`}
+        return (
+          <motion.article
+            layout
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: .96 }}
+            key={h.id}
+            className={`habit ${completed ? "active" : ""}`}
+          >
+            <button
+              type="button"
+              className="check"
+              onClick={() => toggle(h.id)}
+              title="Concluir rotina"
             >
-              <button className="check" onClick={() => toggle(h.id)}>
-                {completed && <Check size={20} />}
-              </button>
+              {completed && <Check size={20} />}
+            </button>
 
-              <div>
-                <strong>{h.title}</strong>
-                <p>{h.category} • {h.goal}</p>
-              </div>
+            <div className="habit-content">
+              {isEditing ? (
+                <div className="edit-inline">
+                  <input
+                    value={editTitle}
+                    onChange={e => setEditTitle(e.target.value)}
+                    placeholder="Nome da rotina"
+                  />
 
-              <button className="delete" onClick={() => remove(h.id)}>
-                <Trash2 size={18} />
-              </button>
-            </motion.article>
-          );
-        })}
-      </AnimatePresence>
-    </div>
-  );
+                  <input
+                    value={editGoal}
+                    onChange={e => setEditGoal(e.target.value)}
+                    placeholder="Meta"
+                  />
+
+                  <input
+                    value={editCategory}
+                    onChange={e => setEditCategory(e.target.value)}
+                    placeholder="Categoria"
+                  />
+                </div>
+              ) : (
+                <>
+                  <strong>{h.title}</strong>
+
+                  <p>
+                    {h.category || "Rotina"} • {h.goal || "Diário"}
+                  </p>
+                </>
+              )}
+
+              {h.links?.length > 0 && (
+                <div className="habit-links">
+                  {h.links.map(link => (
+                    <a
+                      key={link.id}
+                      href={link.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      🔗 {link.label || "Abrir link"}
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {h.files?.length > 0 && (
+                <div className="habit-files">
+                  {h.files.map(file => (
+                    <a
+                      key={file.id}
+                      href={file.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      📄 {file.file_name}
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {uploadingId === h.id && (
+                <small className="uploading-text">
+                  Enviando arquivo...
+                </small>
+              )}
+
+              {isLinking && (
+                <div className="link-inline">
+                  <input
+                    placeholder="https://..."
+                    value={linkUrl}
+                    onChange={e => setLinkUrl(e.target.value)}
+                  />
+
+                  <input
+                    placeholder="Nome do link"
+                    value={linkLabel}
+                    onChange={e => setLinkLabel(e.target.value)}
+                  />
+
+                  <button
+                    type="button"
+                    className="save-btn"
+                    onClick={() => addLink(h.id)}
+                  >
+                    Salvar
+                  </button>
+
+                  <button
+                    type="button"
+                    className="cancel-btn"
+                    onClick={cancelLink}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="habit-actions">
+              {isEditing ? (
+                <>
+                  <button
+                    type="button"
+                    className="save-btn"
+                    onClick={() => saveEdit(h)}
+                  >
+                    Salvar
+                  </button>
+
+                  <button
+                    type="button"
+                    className="cancel-btn"
+                    onClick={cancelEdit}
+                  >
+                    Cancelar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => startLink(h.id)}
+                    title="Adicionar link"
+                  >
+                    🔗
+                  </button>
+
+                  <label
+                    className="file-btn"
+                    title="Anexar arquivo"
+                  >
+                    📄
+
+                    <input
+                      type="file"
+                      accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,image/*"
+                      hidden
+                      onChange={(e) => uploadFile(h.id, e.target.files[0])}
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    className="edit-btn"
+                    onClick={() => startEdit(h)}
+                    title="Editar rotina"
+                  >
+                    ✏️
+                    
+                  </button>
+
+                  <button
+                    type="button"
+                    className="delete"
+                    onClick={() => remove(h.id)}
+                    title="Excluir rotina"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </>
+              )}
+            </div>
+          </motion.article>
+        );
+      })}
+    </AnimatePresence>
+  </div>
+);
 }
 
 function Feature({ icon, title, text }) { return <div className="feature"><span>{icon}</span><strong>{title}</strong><p>{text}</p></div>; }
