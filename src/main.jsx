@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { supabase } from './lib/supabase';
+import LandingPage from "./pages/LandingPage";
+import rytmoLogo from "./assets/rytmo-logo.png";
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight, BarChart3, CalendarDays, Check, CheckCircle2, ChevronRight,
@@ -9,15 +11,27 @@ import {
 } from 'lucide-react';
 import './styles.css';
 
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const formatKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
 
-const formatKey = (date) => date.toISOString().slice(0, 10);
+  return `${year}-${month}-${day}`;
+};
+
+const todayKey = () => formatKey(new Date());
 
 const yesterdayKey = () => {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+  return formatKey(d);
 };
+
+const parseKeyToDate = (key) =>{
+  const [year, month, day] = key.split("-").map(Number);
+
+  return new Date(year, month - 1, day);
+}
 
 
 const getWeekDates = () => {
@@ -271,7 +285,7 @@ useEffect(() => {
     save('planner:habits', next);
   }
 
-  if (route === 'landing') return <Landing navigate={navigate} user={user} />;
+  if (route === 'landing') return <LandingPage navigate={navigate} user={user} />;
   if (!user && route === 'register') return <Auth mode="register" onSubmit={login} navigate={navigate} />;
   if (!user && route === 'forgot') return <Forgot navigate={navigate} />;
   if (!user) return <Auth mode="login" onSubmit={login} navigate={navigate} />;
@@ -416,7 +430,11 @@ function Shell({ user, route, navigate, logout, sidebarOpen, setSidebarOpen, chi
 
 <div className="rytmo-brand">
 
-<div className="logo-orb"/>
+<img
+  src={rytmoLogo}
+  alt="Rytmo"
+  className="rytmo-logo-img"
+/>
 
 <div>
 
@@ -497,7 +515,7 @@ const filteredHabits = habits.filter(habit => {
   >
     <CalendarDays size={18}/>
 
-    {new Date(selectedDate).toLocaleDateString('pt-BR', {
+    {parseKeyToDate(selectedDate).toLocaleDateString('pt-BR', {
       weekday: 'long',
       day: '2-digit',
       month: 'long'
@@ -567,7 +585,10 @@ function HabitsPage({ habits, setHabits }) {
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const [calendarOpen, setCalendarOpen] = useState(false);
   const weekDates = getWeekDates();
-
+  const parseKeyToDate = (key) => {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
   const filteredHabits = habits.filter(habit => {
     return !habit.task_date || habit.task_date === selectedDate;
   });
@@ -582,10 +603,15 @@ function HabitsPage({ habits, setHabits }) {
       <div className="dashboard-actions page-actions">
 
   <button
-    className="calendar-toggle"
-    onClick={() => setCalendarOpen(!calendarOpen)}
-  >
-  </button>
+  className="calendar-toggle"
+  onClick={() => setCalendarOpen(!calendarOpen)}
+>
+
+  <CalendarDays size={18}/>
+
+ 
+</button>
+
 
 </div>
 
@@ -626,7 +652,7 @@ function HabitsPage({ habits, setHabits }) {
       </div>
 
       <h2 className="section-title">
-        Rotina de {new Date(selectedDate).toLocaleDateString('pt-BR', {
+        Rotina de {parseKeyToDate(selectedDate).toLocaleDateString('pt-BR', {
           day: '2-digit',
           month: 'long'
         })}
@@ -656,7 +682,7 @@ function HeatmapCard({ habits }) {
     const d = new Date();
     d.setDate(d.getDate() - i);
 
-    const key = d.toISOString().slice(0, 10);
+    const key = formatKey(d);
 
     const completed = habits.some(
       habit => habit.history?.[key]
@@ -767,10 +793,72 @@ function AnalyticsPage({ habits }) {
 function BillingPage({ user, setUser }) {
   function setPlan(plan) {
     const next = { ...user, plan };
-    setUser(next); save('planner:user', next); save('planner:plan', plan);
+    setUser(next);
+    save("planner:user", next);
+    save("planner:plan", plan);
   }
-  return <section><PageHeader title="Planos" text="Modelo pronto para conectar com Mercado Pago ou Stripe." /><div className="pricing-grid"><Plan title="Free" price="R$0" perks={['Até 5 hábitos', 'Dados locais', 'Dashboard básico']} current={user.plan === 'free'} onClick={() => setPlan('free')} /><Plan title="Pro" price="R$9,90/mês" featured perks={['Hábitos ilimitados', 'Analytics avançado', 'Backup em nuvem futuro']} current={user.plan === 'pro'} onClick={() => setPlan('pro')} /></div></section>;
+
+  async function handleUpgrade() {
+    const response = await fetch("/api/create-checkout-session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        userId: user.id,
+        email: user.email
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert("Erro ao iniciar assinatura.");
+    }
+  }
+
+  return (
+    <section>
+      <PageHeader
+        title="Planos"
+        text="Escolha o plano ideal para sua rotina."
+      />
+
+      <div className="pricing-grid">
+        <Plan
+          title="Free"
+          price="R$0"
+          perks={[
+            "Até 5 rotinas",
+            "Dashboard básico",
+            "Calendário semanal"
+          ]}
+          current={user.plan === "free"}
+          onClick={() => setPlan("free")}
+        />
+
+        <Plan
+          title="Pro"
+          price="R$14,90/mês"
+          featured
+          perks={[
+            "Rotinas ilimitadas",
+            "Analytics avançado",
+            "Links e arquivos",
+            "Backup em nuvem",
+            "Calendário completo",
+            "Experiência premium"
+          ]}
+          current={user.plan === "pro"}
+          onClick={handleUpgrade}
+        />
+      </div>
+    </section>
+  );
 }
+
 
 function SettingsPage({ user, setUser }) {
   const [name, setName] = useState(user.name);
@@ -795,7 +883,7 @@ function useStats(habits) {
       const d = new Date();
       d.setDate(d.getDate() - i);
 
-      const key = d.toISOString().slice(0, 10);
+      const key = formatKey(d);
 
       const label = d
         .toLocaleDateString("pt-BR", { weekday: "short" })
@@ -846,12 +934,19 @@ function NewHabit({ habits, setHabits, selectedDate }) {
   const [title, setTitle] = useState('');
   const [goal, setGoal] = useState('');
   const [category, setCategory] = useState('Rotina');
-
   async function addHabit(e) {
     e.preventDefault();
 
-    if (!title.trim()) return;
+  
 
+    if (!title.trim()) return;
+    const isFree =
+habits.length >= 5;
+
+if (isFree) {
+  alert("Você atingiu o limite do plano Free. Faça upgrade e continue com sua rotina.");
+  return;
+}
     const session = await supabase.auth.getUser();
     const user = session.data.user;
 
@@ -1416,6 +1511,17 @@ async function addLink(habitId) {
 function Feature({ icon, title, text }) { return <div className="feature"><span>{icon}</span><strong>{title}</strong><p>{text}</p></div>; }
 function Stat({ icon, label, value }) { return <div className="stat"><span>{icon}</span><p>{label}</p><strong>{value}</strong></div>; }
 function PageHeader({ title, text }) { return <div className="page-header"><h1>{title}</h1><p>{text}</p></div>; }
-function Plan({ title, price, perks, featured, current, onClick }) { return <article className={`plan ${featured ? 'featured' : ''}`}><h3>{title}</h3><strong>{price}</strong>{perks.map(p => <p key={p}><Check size={16}/>{p}</p>)}<button className="primary" onClick={onClick}>{current ? 'Plano atual' : 'Selecionar'}</button></article>; }
+function Plan({ title, price, perks, featured, current, onClick }) 
+{ return <article className={`plan ${featured ? 'featured' : ''}`}>
+  <h3>{title}</h3><strong>{price}</strong>
+  {perks.map(p => <p key={p}><Check size={16}/>{p}</p>)}
+  <button
+  className={`primary ${featured ? "pro-button" : ""}`}
+  onClick={onClick}
+>
+
+  {current ? "Plano atual" : "Assinar Pro"}
+    </button>
+    </article>; }
 
 createRoot(document.getElementById('root')).render(<App />);

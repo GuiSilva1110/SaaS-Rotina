@@ -381,23 +381,6 @@ nav {
   font-size: 12px;
 }
 
-.logo-orb {
-  width: 44px;
-  height: 44px;
-  border-radius: 16px;
-  background: linear-gradient(135deg,#4F8CFF,#8FE8FF,#B5B7FF);
-  box-shadow: 0 14px 36px rgba(79,140,255,.32);
-  position: relative;
-}
-
-.logo-orb::after {
-  content: "";
-  position: absolute;
-  inset: 10px;
-  border-radius: 12px;
-  background: rgba(255,255,255,.35);
-}
-
 .side-menu {
   display: grid;
   gap: 8px;
@@ -1031,6 +1014,15 @@ nav {
   color: var(--text);
 }
 
+.plan.featured .primary.pro-button {
+  color: #ffffff !important;
+  background: linear-gradient(135deg,#8B5CF6,#4F8CFF,#8FE8FF) !important;
+}
+
+.plan.featured .primary.pro-button:hover {
+  color: #ffffff !important;
+}
+
 .settings-card {
   max-width: 560px;
 }
@@ -1149,4 +1141,96 @@ nav {
   .heatmap-cell {
     height: 20px;
   }
+}
+
+.calendar-toggle {
+
+  height:46px;
+
+  padding:0 18px;
+
+  border:none;
+
+  border-radius:16px;
+
+  display:flex;
+
+  align-items:center;
+
+  gap:10px;
+
+  cursor:pointer;
+
+  font-weight:700;
+
+  color:#2563EB;
+
+  background:
+  rgba(79,140,255,.10);
+
+  transition:.25s ease;
+
+  box-shadow:
+  0 10px 24px
+  rgba(79,140,255,.08);
+
+}
+
+.calendar-toggle:hover {
+
+  background:
+  rgba(79,140,255,.16);
+
+  transform:
+  translateY(-2px);
+
+}
+
+.pro-button {
+
+  background:
+  linear-gradient(
+    135deg,
+    #8B5CF6,
+    #4F8CFF,
+    #8FE8FF
+  );
+
+  background-size:
+  200% 200%;
+
+  animation:
+  gradientMove 6s ease infinite;
+
+}
+
+@keyframes gradientMove {
+
+  0%{
+    background-position:0% 50%;
+  }
+
+  50%{
+    background-position:100% 50%;
+  }
+
+  100%{
+    background-position:0% 50%;
+  }
+
+}
+
+.rytmo-logo-img {
+
+  width:44px;
+  height:44px;
+
+  object-fit:contain;
+
+  border-radius:14px;
+
+  box-shadow:
+  0 10px 30px
+  rgba(79,140,255,.18);
+
 }
